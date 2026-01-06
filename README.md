@@ -22,7 +22,7 @@ Run as root:
 sudo ./cleaner.sh
 ```
 
-Interactive selection shows by default when running in a TTY. To run everything without prompts:
+Interactive selection shows by default when running in a TTY. If `whiptail` or `dialog` is installed, you get a checkbox UI; otherwise it falls back to a plain numbered prompt (and offers to install `whiptail`). To run everything without prompts:
 
 ```bash
 sudo ./cleaner.sh --all
@@ -31,6 +31,8 @@ sudo ./cleaner.sh --all
 Options:
 - `--select` force interactive selection even if stdin is not a TTY
 - `--all` run all cleanup tasks without prompting
+- `--ui` force checkbox UI (requires `whiptail` or `dialog`)
+- `--plain` force the plain numbered prompt
 - `--no-update` skip `apt-get update`
 - `--keep-kernels=N` keep N newest kernel versions (default: 2)
 - `--vacuum=7d` set journal vacuum age (default: 7d)

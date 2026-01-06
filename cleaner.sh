@@ -17,6 +17,7 @@ SELECT_MODE=1
 if [[ ! -t 0 ]]; then
   SELECT_MODE=0
 fi
+UI_MODE="auto"
 
 declare -A RUN_TASKS=(
   [apt_update]=1
@@ -64,11 +65,85 @@ declare -A TASK_LABELS=(
 )
 
 usage() {
-  echo "Usage: $0 [--select|--all] [--no-update] [--keep-kernels=N] [--vacuum=7d]"
+  echo "Usage: $0 [--select|--all] [--ui|--plain] [--no-update] [--keep-kernels=N] [--vacuum=7d]"
 }
 
 select_tasks() {
-  local selection token idx key
+  local selection token idx key dialog_tool status
+
+  dialog_tool=""
+  if [[ "$UI_MODE" != "plain" ]]; then
+    if command -v whiptail >/dev/null 2>&1; then
+      dialog_tool="whiptail"
+    elif command -v dialog >/dev/null 2>&1; then
+      dialog_tool="dialog"
+    fi
+  fi
+
+  if [[ -z "$dialog_tool" && "$UI_MODE" != "plain" ]]; then
+    if [[ -t 0 ]]; then
+      echo -e "${YELLOW}No dialog tool found (whiptail/dialog).${ENDCOLOR}"
+      echo -en "${YELLOW}Install whiptail now? [y/N]: ${ENDCOLOR}"
+      read -r selection
+      if [[ "$selection" =~ ^[Yy]$ ]]; then
+        echo -e "${YELLOW}Installing whiptail...${ENDCOLOR}"
+        if ! apt-get update -qq; then
+          echo -e "${RED}apt-get update failed; continuing install attempt.${ENDCOLOR}"
+        fi
+        if apt-get install -y whiptail; then
+          dialog_tool="whiptail"
+        else
+          echo -e "${RED}Failed to install whiptail.${ENDCOLOR}"
+        fi
+      fi
+    fi
+  fi
+
+  if [[ -n "$dialog_tool" ]]; then
+    local options=()
+    for key in "${TASK_ORDER[@]}"; do
+      options+=("$key" "${TASK_LABELS[$key]}" "ON")
+    done
+
+    if [[ "$dialog_tool" == "dialog" ]]; then
+      mapfile -t selection < <(
+        dialog --stdout --separate-output --title "Linux Cleaner" \
+          --checklist "Select cleanup tasks:" 20 90 12 "${options[@]}"
+      )
+      status=$?
+    else
+      mapfile -t selection < <(
+        whiptail --title "Linux Cleaner" \
+          --checklist "Select cleanup tasks:" 20 90 12 --separate-output "${options[@]}" \
+          3>&1 1>&2 2>&3
+      )
+      status=$?
+    fi
+
+    if [[ $status -ne 0 ]]; then
+      echo -e "${RED}Selection canceled.${ENDCOLOR}"
+      exit 1
+    fi
+
+    for key in "${TASK_ORDER[@]}"; do
+      RUN_TASKS[$key]=0
+    done
+
+    if [[ ${#selection[@]} -eq 0 ]]; then
+      echo -e "${YELLOW}No tasks selected. Exiting.${ENDCOLOR}"
+      exit 0
+    fi
+
+    for token in "${selection[@]}"; do
+      RUN_TASKS[$token]=1
+    done
+    return 0
+  fi
+
+  if [[ "$UI_MODE" == "dialog" ]]; then
+    echo -e "${RED}No dialog tool found (whiptail/dialog). Install one or use --plain.${ENDCOLOR}"
+    exit 1
+  fi
 
   echo -e "${CYAN}Select cleanup tasks (space-separated numbers, or press Enter for all):${ENDCOLOR}"
   idx=1
@@ -114,6 +189,12 @@ for arg in "$@"; do
       ;;
     --all)
       SELECT_MODE=0
+      ;;
+    --ui)
+      UI_MODE="dialog"
+      ;;
+    --plain)
+      UI_MODE="plain"
       ;;
     --no-update)
       SKIP_UPDATE=1
