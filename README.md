@@ -22,7 +22,15 @@ Run as root:
 sudo ./cleaner.sh
 ```
 
+Interactive selection shows by default when running in a TTY. To run everything without prompts:
+
+```bash
+sudo ./cleaner.sh --all
+```
+
 Options:
+- `--select` force interactive selection even if stdin is not a TTY
+- `--all` run all cleanup tasks without prompting
 - `--no-update` skip `apt-get update`
 - `--keep-kernels=N` keep N newest kernel versions (default: 2)
 - `--vacuum=7d` set journal vacuum age (default: 7d)
