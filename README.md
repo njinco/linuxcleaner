@@ -22,6 +22,12 @@ Run as root:
 sudo ./cleaner.sh
 ```
 
+Download the script with curl:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/njinco/linuxcleaner/main/cleaner.sh -o cleaner.sh
+```
+
 Interactive selection shows by default when running in a TTY. If `whiptail` or `dialog` is installed, you get a checkbox UI; otherwise it falls back to a plain numbered prompt (and offers to install `whiptail`). To run everything without prompts:
 
 ```bash
