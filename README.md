@@ -44,3 +44,6 @@ Options:
 
 ## Credit
 Adapted from 71529-ubucleaner.sh - http://www.opendesktop.org/CONTENT/content-files/71529-ubucleaner.sh (link now defunct; credited for historical reference).
+
+## License
+GNU General Public License v3.0 or later. See `LICENSE`.

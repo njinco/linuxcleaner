@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (c) 2026 enkiel
 # Ubuntu/Debian Cleaner Script
 # Merged from cleaner.sh and cleanerv2.sh
 # Cleans apt cache, unused packages, residual configs, old kernels, logs, snap/flatpak leftovers,
