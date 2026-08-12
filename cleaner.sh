@@ -70,6 +70,30 @@ usage() {
   echo "Usage: $0 [--select|--all] [--ui|--plain] [--no-update] [--keep-kernels=N] [--vacuum=7d]"
 }
 
+die() {
+  echo -e "${RED}Error: $*${ENDCOLOR}" >&2
+  exit 1
+}
+
+validate_options() {
+  if [[ ! "$KEEP_KERNELS" =~ ^[1-9][0-9]*$ ]]; then
+    die "--keep-kernels must be a positive integer"
+  fi
+
+  if [[ ! "$JOURNAL_VACUUM" =~ ^[0-9]+(s|min|h|d|weeks?|months?|years?)$ ]]; then
+    die "--vacuum must be a systemd time span like 7d, 24h, 30min, 2weeks, or 1month"
+  fi
+}
+
+empty_dir_contents() {
+  local dir
+
+  for dir in "$@"; do
+    [[ -d "$dir" ]] || continue
+    find "$dir" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} + 2>/dev/null
+  done
+}
+
 select_tasks() {
   local selection token idx key dialog_tool status
 
@@ -219,6 +243,8 @@ for arg in "$@"; do
   esac
 done
 
+validate_options
+
 if [[ $EUID -ne 0 ]]; then
   echo -e "${RED}Error: must be run as root. Exiting...${ENDCOLOR}"
   exit 1
@@ -315,10 +341,13 @@ fi
 
 if [[ ${RUN_TASKS[trash]} -eq 1 ]]; then
   echo -e "${YELLOW}Emptying user trash folders...${ENDCOLOR}"
-  find /home/*/.local/share/Trash/files/ -mindepth 1 -delete 2>/dev/null
-  find /home/*/.local/share/Trash/info/ -mindepth 1 -delete 2>/dev/null
-  find /root/.local/share/Trash/files/ -mindepth 1 -delete 2>/dev/null
-  find /root/.local/share/Trash/info/ -mindepth 1 -delete 2>/dev/null
+  while IFS= read -r -d '' trash_dir; do
+    empty_dir_contents "$trash_dir"
+  done < <(
+    find /home /root -type d \
+      \( -path '*/.local/share/Trash/files' -o -path '*/.local/share/Trash/info' \) \
+      -print0 2>/dev/null
+  )
 fi
 
 if [[ ${RUN_TASKS[snap]} -eq 1 ]] && command -v snap >/dev/null 2>&1; then
@@ -344,22 +373,20 @@ fi
 
 if [[ ${RUN_TASKS[crash]} -eq 1 ]]; then
   echo -e "${YELLOW}Clearing crash dumps and coredumps...${ENDCOLOR}"
-  rm -rf /var/crash/* 2>/dev/null
+  empty_dir_contents /var/crash
   if command -v coredumpctl >/dev/null 2>&1; then
     coredumpctl purge >/dev/null 2>&1
   elif [[ -d /var/lib/systemd/coredump ]]; then
-    rm -rf /var/lib/systemd/coredump/* 2>/dev/null
+    empty_dir_contents /var/lib/systemd/coredump
   fi
 fi
 
 if [[ ${RUN_TASKS[caches]} -eq 1 ]]; then
   echo -e "${YELLOW}Trimming user cache directories...${ENDCOLOR}"
   find /home -mindepth 2 -maxdepth 2 -type d -name .cache -print0 2>/dev/null | while IFS= read -r -d '' cache_dir; do
-    rm -rf "${cache_dir:?}/"* 2>/dev/null
+    empty_dir_contents "$cache_dir"
   done
-  if [[ -d /root/.cache ]]; then
-    rm -rf /root/.cache/* 2>/dev/null
-  fi
+  empty_dir_contents /root/.cache
 fi
 
 if [[ ${RUN_TASKS[rotated_logs]} -eq 1 ]]; then
